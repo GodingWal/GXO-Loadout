@@ -204,3 +204,5 @@ public/
 | ML inference (runs in browser when added) | **$0** |
 | Custom domain (optional) | ~$1/mo |
 | **Total** | **$0–$12/year** |
+#   G X O - L o a d o u t  
+ 
