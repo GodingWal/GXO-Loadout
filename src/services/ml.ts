@@ -21,15 +21,46 @@ export async function preloadOCR(): Promise<void> {
   return Promise.resolve();
 }
 
+// Downscale a photo before upload — phone captures are 4–12 MB but the VLM
+// doesn't need more than ~1600px on the long edge, and smaller uploads cut
+// round-trip latency substantially.
+const MAX_UPLOAD_DIMENSION = 1600;
+const UPLOAD_JPEG_QUALITY = 0.85;
+
+async function downscaleForUpload(blob: Blob): Promise<Blob> {
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const longEdge = Math.max(bitmap.width, bitmap.height);
+    if (longEdge <= MAX_UPLOAD_DIMENSION) return blob;
+
+    const scale = MAX_UPLOAD_DIMENSION / longEdge;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return blob;
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+    const resized = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', UPLOAD_JPEG_QUALITY)
+    );
+    return resized && resized.size < blob.size ? resized : blob;
+  } catch (err) {
+    console.warn('[loadout-ml] Downscale failed, uploading original:', err);
+    return blob;
+  }
+}
+
 /**
- * Send the photographed asset to the Jetson Orin server for NVIDIA Cosmos VLM analysis.
+ * Send the photographed asset to the edge server for NVIDIA Cosmos VLM analysis.
  */
 export async function analyzePhoto(req: MLAnalysisRequest): Promise<PhotoMLResults> {
   const now = new Date().toISOString();
-  
+
   try {
+    const uploadBlob = await downscaleForUpload(req.photoBlob);
     const formData = new FormData();
-    formData.append('file', req.photoBlob, 'photo.jpg');
+    formData.append('file', uploadBlob, 'photo.jpg');
     formData.append('category', req.category);
     
     if (req.expectedBatches && req.expectedBatches.length > 0) {

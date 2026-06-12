@@ -7,6 +7,24 @@
 > then open http://localhost:8080). The rest of this doc covers the split
 > setup (GPU on Vast, app elsewhere).
 
+## Files in this directory
+
+- `setup_server.sh` — one-shot single-box install (app + vLLM + restart hook + backups)
+- `run_services.sh` — (re)starts both services; installed as `/root/onstart.sh` so
+  they come back after an instance restart
+- `backup.sh` — nightly cron backup of `loadout.db` + `uploads/`; set
+  `BACKUP_REMOTE` (rsync destination) or `BACKUP_RCLONE` to ship archives off the
+  box — Vast instances are ephemeral, don't keep the only copy there
+- `onstart.sh` — vLLM-only on-start script for the split setup below
+
+**Security note:** both services bind to `127.0.0.1` only — access is via the SSH
+tunnel. Set `HOST=0.0.0.0` on the app only if you intentionally expose it (and put
+auth/TLS in front; the API itself is unauthenticated).
+
+**Measuring accuracy:** once live, build a labeled set of real photos and run
+`python3 scripts/eval.py --data eval_data --server http://127.0.0.1:8080` to get
+per-category accuracy (see the docstring in `scripts/eval.py` for the layout).
+
 The GXO Loadout edge server (`server.py`) no longer runs the model itself. All
 vision tasks (bag counting, batch-code OCR, picklist/BOL extraction, damage
 assessment) are sent to an OpenAI-compatible endpoint defined by

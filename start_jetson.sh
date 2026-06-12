@@ -22,4 +22,6 @@ echo "[3/3] Launching Edge Server on port 8000..."
 # Point inference at the Vast.ai Cosmos server (see deploy/vastai/README.md):
 # export COSMOS_ENDPOINT="http://<vast-ip>:<port>/v1"
 # export COSMOS_API_KEY="your-vllm-api-key"
+# The server binds to 127.0.0.1 by default; for LAN access from tablets:
+# export HOST=0.0.0.0
 python server.py

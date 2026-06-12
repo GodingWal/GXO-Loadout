@@ -29,14 +29,18 @@ app = FastAPI(
 import sys
 app.ssl_enabled = "--ssl" in sys.argv or os.getenv("USE_HTTPS", "false").lower() == "true"
 
-# Enable CORS for local testing/development
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# The frontend is served same-origin (or via the Vite dev proxy), so CORS is
+# closed by default. Set ALLOWED_ORIGINS="https://foo,https://bar" if a
+# cross-origin client genuinely needs access.
+_allowed_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+if _allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # Directory to save uploaded photos
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
@@ -73,8 +77,9 @@ def init_db():
 
 init_db()
 
-# Request Queue Concurrency Rate Limiter
-cosmos_semaphore = asyncio.Semaphore(1)
+# Request Queue Concurrency Rate Limiter (vLLM batches requests, so a few in
+# flight at once is fine; tune with COSMOS_CONCURRENCY)
+cosmos_semaphore = asyncio.Semaphore(int(os.getenv("COSMOS_CONCURRENCY", "3")))
 
 # Helper to parse different ISO date string formats
 def parse_iso_datetime(dt_str: str) -> datetime:
@@ -289,7 +294,9 @@ class CosmosModelDriver:
                 }
             ],
             "max_tokens": 1024,
-            "temperature": 0.1
+            "temperature": 0.1,
+            # JSON mode (guided decoding) guarantees syntactically valid JSON output
+            "response_format": {"type": "json_object"}
         }
 
         logger.info(f"Sending request to Cosmos endpoint {self.endpoint} ({self.model_name})...")
@@ -299,6 +306,13 @@ class CosmosModelDriver:
             json=payload,
             timeout=self.timeout
         )
+
+        if response.status_code == 400 and "response_format" in response.text:
+            # Endpoint doesn't support JSON mode — retry once relying on the prompt
+            payload.pop("response_format", None)
+            response = requests.post(
+                f"{self.endpoint}/chat/completions", headers=headers, json=payload, timeout=self.timeout
+            )
 
         if response.status_code != 200:
             raise HTTPException(status_code=response.status_code, detail=f"Cosmos endpoint error: {response.text}")
@@ -421,18 +435,57 @@ class CosmosModelDriver:
             "modelVersions": {"cosmos_vlm": "nvidia-cosmos-mock-v1"}
         }
 
+    # Where the frontend expects category results nested under a named field,
+    # map the flat model output into that envelope. Values are
+    # (envelope_key, required_model_keys) — envelope_key None keeps results flat.
+    _CATEGORY_ENVELOPES = {
+        'Pallet_BagFlap': (None, ['detectedBatchCode']),
+        'Pallet_LPN': (None, ['detectedBatchCode']),
+        'Pallet_Side': (None, ['bagCount']),
+        'Pallet_GateSeal': (None, ['accuracyLabelDetected']),
+        'Pallet_Placard': ('placardFields', ['batches']),
+        'Picklist': ('picklistFields', ['loadNumber', 'lineItems']),
+        'BOL': ('bolFields', ['loadNumber', 'deliveries']),
+        'Returns_BOL': ('returnsBolFields', ['bolNumber']),
+        'Returns_Damage_Assessment': ('returnsDamageAssessment', ['damageDetected']),
+    }
+
+    def _validate_and_wrap(self, category: str, result: dict) -> dict:
+        if not isinstance(result, dict):
+            raise ValueError(f"Model returned non-object JSON: {type(result).__name__}")
+
+        envelope_key, required_keys = self._CATEGORY_ENVELOPES.get(category, (None, []))
+        missing = [k for k in required_keys if k not in result]
+        if missing:
+            raise ValueError(f"Model output for '{category}' is missing required fields: {missing} (got keys: {list(result.keys())})")
+
+        if envelope_key:
+            result = {envelope_key: result}
+        return result
+
     def analyze(self, image_bytes: bytes, category: str, expected_batches: Optional[List[str]] = None, expected_bag_count: Optional[int] = None) -> dict:
         prompt, schema = self._get_prompt_and_schema(category, expected_batches, expected_bag_count)
-        
+        import time
+        now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
         try:
             if self.endpoint:
-                return self._run_remote(image_bytes, prompt, schema)
+                result = self._validate_and_wrap(category, self._run_remote(image_bytes, prompt, schema))
+                result.setdefault("analyzedAt", now)
+                result.setdefault("modelVersions", {"cosmos_vlm": self.model_name})
+                result["source"] = "live"
+                return result
             else:
                 logger.info(f"Using high-fidelity mock fallback for category '{category}'")
-                return self._run_mock(category, expected_batches, expected_bag_count)
+                result = self._run_mock(category, expected_batches, expected_bag_count)
+                result["source"] = "mock"
+                return result
         except Exception as e:
             logger.error(f"Error in NVIDIA Cosmos analysis: {e}. Falling back to mock data.")
-            return self._run_mock(category, expected_batches, expected_bag_count)
+            result = self._run_mock(category, expected_batches, expected_bag_count)
+            result["source"] = "mock"
+            result["errors"] = [f"live_inference_failed: {e}"]
+            return result
 
 # Instantiate drivers
 cosmos_driver = CosmosModelDriver()
@@ -1206,9 +1259,11 @@ if __name__ == "__main__":
     
     uvicorn_kwargs = {
         "app": "server:app",
-        "host": "0.0.0.0",
+        # Bind to loopback only (access via SSH tunnel / reverse proxy) unless
+        # HOST is explicitly set, e.g. HOST=0.0.0.0 for LAN/docker deployments.
+        "host": os.getenv("HOST", "127.0.0.1"),
         "port": int(os.getenv("PORT", "8000")),
-        "reload": True
+        "reload": os.getenv("RELOAD", "false").lower() == "true"
     }
     
     if use_ssl:

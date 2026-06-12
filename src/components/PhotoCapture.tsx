@@ -215,6 +215,15 @@ export function SlotPhotoCapture({
         {!analyzing && ml?.detectedStopNumber !== undefined && (
           <div className="photo-slot__badge">Stop {ml.detectedStopNumber}</div>
         )}
+        {!analyzing && ml?.source === 'mock' && (
+          <div
+            className="photo-slot__badge"
+            style={{ background: 'var(--warn, #b45309)', color: '#fff' }}
+            title="The AI server was unreachable — these values are placeholder data and must be verified manually."
+          >
+            ⚠ MOCK DATA
+          </div>
+        )}
       </div>
       <OCRDebugPanel mlResults={existingPhoto.mlResults} expectedBatches={expectedBatches} />
       {pending && (
@@ -378,6 +387,15 @@ export function MultiPhotoCapture({
                 />
                 {analyzing[p.id] && (
                   <div className="photo-tile__badge photo-tile__badge--working">analyzing…</div>
+                )}
+                {!analyzing[p.id] && p.mlResults?.source === 'mock' && (
+                  <div
+                    className="photo-tile__badge"
+                    style={{ background: 'var(--warn, #b45309)', color: '#fff' }}
+                    title="The AI server was unreachable — these values are placeholder data and must be verified manually."
+                  >
+                    ⚠ MOCK DATA
+                  </div>
                 )}
               </div>
             ))}

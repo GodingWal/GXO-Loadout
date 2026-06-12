@@ -9,6 +9,7 @@ services:
     ports:
       - "8000:8000" # Keep port 8000 mapped for direct HTTP testing if desired
     environment:
+      - HOST=0.0.0.0 # inside the container; Caddy fronts external traffic
       - COSMOS_ENDPOINT=${COSMOS_ENDPOINT:-} # OpenAI-compatible endpoint on the Vast.ai GPU server, e.g. http://<vast-ip>:<port>/v1
       - COSMOS_API_KEY=${COSMOS_API_KEY:-}
       - COSMOS_MODEL_NAME=${COSMOS_MODEL_NAME:-nvidia/Cosmos-Reason1-7B}

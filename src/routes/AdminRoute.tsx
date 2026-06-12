@@ -678,8 +678,38 @@ function SecurityPanel() {
   );
 }
 
+interface ServerHealth {
+  status: string;
+  cpu_usage_percent: number;
+  ram_usage_percent: number;
+  // Either the usage numbers or `error` is present; code guards on `error`.
+  disk_space: {
+    total_gb: number;
+    used_gb: number;
+    free_gb: number;
+    percent_used: number;
+    error?: string;
+  };
+  gpu_info: {
+    nvidia_gpu_detected: boolean;
+    details?: string;
+    temperature_c?: number;
+    utilization_percent?: number;
+    memory_used_mb?: number;
+    memory_total_mb?: number;
+  };
+  model_driver: {
+    model_name: string;
+    endpoint: string | null;
+    api_key_set: boolean;
+    endpoint_available: boolean;
+  };
+  local_ip: string;
+  ssl_enabled: boolean;
+}
+
 function DiagnosticsPanel() {
-  const [health, setHealth] = useState<any>(null);
+  const [health, setHealth] = useState<ServerHealth | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

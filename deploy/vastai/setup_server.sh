@@ -43,14 +43,20 @@ npm run build
 echo "==> [3/5] Installing vLLM (this can take several minutes)..."
 pip3 install -q vllm
 
-echo "==> [4/5] Starting vLLM with $MODEL on port $VLLM_PORT..."
-tmux kill-session -t cosmos 2>/dev/null || true
-tmux new-session -d -s cosmos \
-  "python3 -m vllm.entrypoints.openai.api_server \
-     --model '$MODEL' --host 127.0.0.1 --port $VLLM_PORT \
-     --max-model-len 8192 --gpu-memory-utilization 0.85 \
-     2>&1 | tee /var/log/cosmos-vllm.log"
-echo "    Waiting for model to load (first run downloads ~16GB of weights)..."
+echo "==> [4/5] Installing service launcher, restart hook, and nightly backup..."
+chmod +x "$APP_DIR/deploy/vastai/run_services.sh" "$APP_DIR/deploy/vastai/backup.sh"
+# Vast.ai runs /root/onstart.sh on every instance (re)start
+cp "$APP_DIR/deploy/vastai/run_services.sh" /root/onstart.sh
+chmod +x /root/onstart.sh
+# Nightly backup of the DB + photos at 02:15 (set BACKUP_REMOTE to ship off-box)
+( crontab -l 2>/dev/null | grep -v 'deploy/vastai/backup.sh'; \
+  echo "15 2 * * * APP_DIR=$APP_DIR bash $APP_DIR/deploy/vastai/backup.sh >> /var/log/gxo-backup.log 2>&1" ) | crontab -
+
+echo "==> [5/5] Starting services (vLLM + app, bound to localhost only)..."
+APP_DIR="$APP_DIR" APP_PORT="$APP_PORT" VLLM_PORT="$VLLM_PORT" COSMOS_MODEL_NAME="$MODEL" \
+  bash "$APP_DIR/deploy/vastai/run_services.sh"
+
+echo "    Waiting for the model to load (first run downloads ~16GB of weights)..."
 for i in $(seq 1 240); do
   if curl -s "http://127.0.0.1:$VLLM_PORT/v1/models" | grep -q "$MODEL"; then
     echo "    vLLM is up."
@@ -59,12 +65,6 @@ for i in $(seq 1 240); do
   sleep 10
   [ "$i" = 240 ] && { echo "    vLLM did not come up in 40min — check: tmux attach -t cosmos"; exit 1; }
 done
-
-echo "==> [5/5] Starting GXO Loadout app on port $APP_PORT..."
-tmux kill-session -t loadout 2>/dev/null || true
-tmux new-session -d -s loadout \
-  "cd '$APP_DIR' && PORT=$APP_PORT COSMOS_ENDPOINT=http://127.0.0.1:$VLLM_PORT/v1 \
-   python3 server.py 2>&1 | tee /var/log/gxo-loadout.log"
 sleep 5
 curl -s "http://127.0.0.1:$APP_PORT/api/health" | head -c 400 && echo
 

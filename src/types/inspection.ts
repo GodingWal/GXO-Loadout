@@ -103,6 +103,9 @@ export interface PhotoMLResults {
   returnsDamageAssessment?: ReturnsDamageAssessment;
   analyzedAt?: string;
   modelVersions?: Record<string, string>;
+  // 'live' = real Cosmos VLM inference; 'mock' = server fallback data that
+  // must NOT be trusted for verification decisions.
+  source?: 'live' | 'mock';
   errors?: string[];
   // Debug-only: full OCR pipeline output for development / accuracy tuning.
   // Surfaced via ?ocrdebug URL param.
