@@ -2,10 +2,8 @@ import os
 import json
 import base64
 import logging
-from io import BytesIO
 from typing import List, Optional
 import requests
-from PIL import Image
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -100,61 +98,23 @@ def parse_iso_datetime(dt_str: str) -> datetime:
 # ============================================================
 
 class CosmosModelDriver:
-    def __init__(self):
-        self.api_key = os.getenv("NVIDIA_API_KEY", "")
-        self.local_nim_url = os.getenv("COSMOS_LOCAL_NIM_URL", "http://localhost:8008/v1")
-        self.model_name = os.getenv("COSMOS_MODEL_NAME", "nvidia/cosmos-1.0-reasoning-2b-chat")
-        
-        # Local GPU loading via transformers (if explicitly enabled)
-        self.local_gpu_enabled = os.getenv("COSMOS_LOCAL_GPU", "false").lower() == "true"
-        self._processor = None
-        self._model = None
-        
-        # Log system graphics adapters for user diagnostics
-        self._log_graphics_info()
-        
-        if self.local_gpu_enabled:
-            try:
-                import torch
-                if not torch.cuda.is_available():
-                    logger.warning("COSMOS_LOCAL_GPU=true was set, but PyTorch reports CUDA is NOT available on this system.")
-                    self.local_gpu_enabled = False
-                else:
-                    logger.info(f"Attempting to load local NVIDIA Cosmos VLM ({self.model_name}) on CUDA GPU...")
-                    from transformers import AutoProcessor, AutoModelForCausalLM
-                    self._processor = AutoProcessor.from_pretrained(self.model_name, trust_remote_code=True)
-                    self._model = AutoModelForCausalLM.from_pretrained(
-                        self.model_name, 
-                        trust_remote_code=True,
-                        torch_dtype=torch.float16,
-                        device_map="auto"
-                    )
-                    logger.info("Local GPU Cosmos model loaded successfully!")
-            except Exception as e:
-                logger.warning(f"Could not load local GPU Cosmos model: {e}. Falling back to API/Mock.")
-                self.local_gpu_enabled = False
+    """Drives an NVIDIA Cosmos VLM served on a remote GPU host (e.g. a Vast.ai
+    instance running vLLM) through an OpenAI-compatible chat completions API.
+    Falls back to high-fidelity mock data when no endpoint is configured."""
 
-    def _log_graphics_info(self):
-        logger.info("Checking graphics hardware diagnostics for NVIDIA Cosmos local execution...")
-        try:
-            # On Windows, query CIM for GPU controllers
-            import subprocess
-            cmd = "powershell -Command \"Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name\""
-            res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-            if res.returncode == 0 and res.stdout.strip():
-                gpus = [line.strip() for line in res.stdout.splitlines() if line.strip()]
-                logger.info(f"System Graphics Hardware detected: {gpus}")
-                nvidia_detected = any("nvidia" in gpu.lower() for gpu in gpus)
-                if not nvidia_detected:
-                    logger.warning(
-                        f"No NVIDIA GPU was detected on this machine (found: {gpus}). "
-                        "NVIDIA Cosmos local GPU inference requires an NVIDIA GPU with CUDA. "
-                        "To test the actual Cosmos VLM model locally, please set the 'NVIDIA_API_KEY' environment variable to use the Cloud NIM fallback."
-                    )
-            else:
-                logger.info("No graphics controller information returned by system query.")
-        except Exception as e:
-            logger.info(f"Could not retrieve graphics diagnostics: {e}")
+    def __init__(self):
+        self.endpoint = os.getenv("COSMOS_ENDPOINT", "").rstrip("/")
+        self.api_key = os.getenv("COSMOS_API_KEY", "")
+        self.model_name = os.getenv("COSMOS_MODEL_NAME", "nvidia/Cosmos-Reason1-7B")
+        self.timeout = int(os.getenv("COSMOS_TIMEOUT_SECONDS", "90"))
+
+        if self.endpoint:
+            logger.info(f"Cosmos inference endpoint configured: {self.endpoint} (model: {self.model_name})")
+        else:
+            logger.warning(
+                "COSMOS_ENDPOINT is not set — bag counting / OCR will use mock data. "
+                "Point COSMOS_ENDPOINT at the Vast.ai vLLM server, e.g. http://<vast-ip>:<port>/v1"
+            )
 
     def _get_prompt_and_schema(self, category: str, expected_batches: Optional[List[str]] = None, expected_bag_count: Optional[int] = None):
         batches_str = ", ".join(expected_batches) if expected_batches else "None provided"
@@ -295,71 +255,28 @@ class CosmosModelDriver:
             
         return prompt, schema
 
-    def local_nim_available(self) -> bool:
+    def endpoint_available(self) -> bool:
+        if not self.endpoint:
+            return False
         try:
-            res = requests.get(f"{self.local_nim_url}/models", timeout=1)
+            headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+            res = requests.get(f"{self.endpoint}/models", headers=headers, timeout=3)
             return res.status_code == 200
         except Exception:
             return False
 
-    def _run_cloud_nim(self, image_bytes: bytes, prompt: str, schema: dict) -> dict:
+    def _run_remote(self, image_bytes: bytes, prompt: str, schema: dict) -> dict:
         base64_image = base64.b64encode(image_bytes).decode('utf-8')
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
         full_prompt = (
             f"{prompt}\n\n"
             f"You MUST output raw JSON and ONLY raw JSON. Do not include markdown code block formatting (like ```json). "
             f"The JSON object must match this schema:\n{json.dumps(schema, indent=2)}"
         )
-        
-        payload = {
-            "model": self.model_name,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": full_prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                    ]
-                }
-            ],
-            "max_tokens": 1024,
-            "temperature": 0.1
-        }
-        
-        logger.info(f"Sending request to NVIDIA Cloud NIM API ({self.model_name})...")
-        response = requests.post(
-            "https://integrate.api.nvidia.com/v1/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=30
-        )
-        
-        if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail=f"NVIDIA Cloud NIM API Error: {response.text}")
-            
-        res_json = response.json()
-        content = res_json['choices'][0]['message']['content'].strip()
-        
-        if content.startswith("```"):
-            lines = content.splitlines()
-            if lines[0].startswith("```json") or lines[0].startswith("```"):
-                content = "\n".join(lines[1:-1])
-        
-        return json.loads(content)
 
-    def _run_local_nim(self, image_bytes: bytes, prompt: str, schema: dict) -> dict:
-        base64_image = base64.b64encode(image_bytes).decode('utf-8')
-        headers = {"Content-Type": "application/json"}
-        
-        full_prompt = (
-            f"{prompt}\n\n"
-            f"Output strictly raw JSON matching this schema:\n{json.dumps(schema)}"
-        )
-        
         payload = {
             "model": self.model_name,
             "messages": [
@@ -374,37 +291,30 @@ class CosmosModelDriver:
             "max_tokens": 1024,
             "temperature": 0.1
         }
-        
-        logger.info(f"Sending request to Local NVIDIA NIM container at {self.local_nim_url}...")
+
+        logger.info(f"Sending request to Cosmos endpoint {self.endpoint} ({self.model_name})...")
         response = requests.post(
-            f"{self.local_nim_url}/chat/completions",
+            f"{self.endpoint}/chat/completions",
             headers=headers,
             json=payload,
-            timeout=15
+            timeout=self.timeout
         )
-        
+
         if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail=f"Local NIM container error: {response.text}")
-            
+            raise HTTPException(status_code=response.status_code, detail=f"Cosmos endpoint error: {response.text}")
+
         res_json = response.json()
         content = res_json['choices'][0]['message']['content'].strip()
+
         if content.startswith("```"):
             lines = content.splitlines()
             content = "\n".join(lines[1:-1])
-            
-        return json.loads(content)
 
-    def _run_local_gpu(self, image: Image.Image, prompt: str, schema: dict) -> dict:
-        inputs = self._processor(text=prompt, images=image, return_tensors="pt").to("cuda")
-        import torch
-        with torch.no_grad():
-            outputs = self._model.generate(**inputs, max_new_tokens=512)
-        generated_text = self._processor.batch_decode(outputs, skip_special_tokens=True)[0]
-        
-        if "{" in generated_text:
-            json_str = generated_text[generated_text.find("{"):generated_text.rfind("}")+1]
-            return json.loads(json_str)
-        return {"raw_output": generated_text}
+        # Reasoning models may wrap the JSON in commentary — extract the outermost object
+        if not content.startswith("{") and "{" in content:
+            content = content[content.find("{"):content.rfind("}") + 1]
+
+        return json.loads(content)
 
     def _run_mock(self, category: str, expected_batches: Optional[List[str]], expected_bag_count: Optional[int]) -> dict:
         import time
@@ -515,13 +425,8 @@ class CosmosModelDriver:
         prompt, schema = self._get_prompt_and_schema(category, expected_batches, expected_bag_count)
         
         try:
-            if self.local_gpu_enabled and self._model:
-                image = Image.open(BytesIO(image_bytes))
-                return self._run_local_gpu(image, prompt, schema)
-            elif self.api_key:
-                return self._run_cloud_nim(image_bytes, prompt, schema)
-            elif self.local_nim_available():
-                return self._run_local_nim(image_bytes, prompt, schema)
+            if self.endpoint:
+                return self._run_remote(image_bytes, prompt, schema)
             else:
                 logger.info(f"Using high-fidelity mock fallback for category '{category}'")
                 return self._run_mock(category, expected_batches, expected_bag_count)
@@ -1140,10 +1045,9 @@ async def health_check():
     # 4. Cosmos Model Status
     model_driver = {
         "model_name": cosmos_driver.model_name,
-        "local_gpu_enabled": cosmos_driver.local_gpu_enabled,
-        "nvidia_api_key_set": bool(cosmos_driver.api_key),
-        "local_nim_url": cosmos_driver.local_nim_url,
-        "local_nim_available": cosmos_driver.local_nim_available()
+        "endpoint": cosmos_driver.endpoint or None,
+        "api_key_set": bool(cosmos_driver.api_key),
+        "endpoint_available": cosmos_driver.endpoint_available()
     }
     
     # 5. Network info

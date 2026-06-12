@@ -9,10 +9,10 @@ services:
     ports:
       - "8000:8000" # Keep port 8000 mapped for direct HTTP testing if desired
     environment:
-      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
-      - COSMOS_LOCAL_GPU=${COSMOS_LOCAL_GPU:-false}
-      - COSMOS_LOCAL_NIM_URL=${COSMOS_LOCAL_NIM_URL:-http://localhost:8008/v1}
-      - COSMOS_MODEL_NAME=${COSMOS_MODEL_NAME:-nvidia/cosmos-1.0-reasoning-2b-chat}
+      - COSMOS_ENDPOINT=${COSMOS_ENDPOINT:-} # OpenAI-compatible endpoint on the Vast.ai GPU server, e.g. http://<vast-ip>:<port>/v1
+      - COSMOS_API_KEY=${COSMOS_API_KEY:-}
+      - COSMOS_MODEL_NAME=${COSMOS_MODEL_NAME:-nvidia/Cosmos-Reason1-7B}
+      - COSMOS_TIMEOUT_SECONDS=${COSMOS_TIMEOUT_SECONDS:-90}
       - USE_HTTPS=false # FastAPI runs on plain HTTP internally, Caddy handles HTTPS externally
     volumes:
       - ./uploads:/app/uploads

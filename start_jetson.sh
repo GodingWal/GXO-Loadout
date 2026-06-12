@@ -19,7 +19,7 @@ npm run build
 
 echo
 echo "[3/3] Launching Edge Server on port 8000..."
-# To run local GPU-accelerated NVIDIA Cosmos model, pass COSMOS_LOCAL_GPU=true
-# export COSMOS_LOCAL_GPU=true
-# export NVIDIA_API_KEY="your-api-key"
+# Point inference at the Vast.ai Cosmos server (see deploy/vastai/README.md):
+# export COSMOS_ENDPOINT="http://<vast-ip>:<port>/v1"
+# export COSMOS_API_KEY="your-vllm-api-key"
 python server.py

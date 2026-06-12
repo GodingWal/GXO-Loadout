@@ -23,5 +23,8 @@ if %errorlevel% neq 0 (
 )
 echo.
 echo [3/3] Launching Edge Server on http://localhost:8000 ...
+REM Point inference at the Vast.ai Cosmos server (see deploy\vastai\README.md):
+REM set COSMOS_ENDPOINT=http://your-vast-ip:port/v1
+REM set COSMOS_API_KEY=your-vllm-api-key
 python server.py
 pause

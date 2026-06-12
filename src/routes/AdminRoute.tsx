@@ -833,8 +833,8 @@ function DiagnosticsPanel() {
                     <span className="soft italic" style={{ color: 'var(--warn)' }}>Not detected</span>
                   </div>
                   <div className="xs soft mt-4">
-                    Edge hardware diagnostics check (nvidia-smi) returned: {health.gpu_info?.details || 'Not available'}. 
-                    Cosmos VLM is falling back to Cloud NIM or mock inferences.
+                    Edge hardware diagnostics check (nvidia-smi) returned: {health.gpu_info?.details || 'Not available'}.
+                    This is expected — Cosmos VLM inference runs on the remote Vast.ai GPU endpoint.
                   </div>
                 </div>
               )}
@@ -849,21 +849,17 @@ function DiagnosticsPanel() {
                   <span className="mono">{health.model_driver.model_name}</span>
                 </div>
                 <div className="row-between">
-                  <span className="soft">Local GPU Loader</span>
-                  <span>{health.model_driver.local_gpu_enabled ? 'Active (Local CUDA execution)' : 'Inactive'}</span>
+                  <span className="soft">Inference Endpoint (Vast.ai)</span>
+                  <span className="mono">{health.model_driver.endpoint || 'Not configured (mock mode)'}</span>
                 </div>
                 <div className="row-between">
-                  <span className="soft">Cloud NIM API Key</span>
-                  <span>{health.model_driver.nvidia_api_key_set ? 'Loaded (Using NVIDIA build key)' : 'Not set'}</span>
+                  <span className="soft">Endpoint API Key</span>
+                  <span>{health.model_driver.api_key_set ? 'Loaded' : 'Not set'}</span>
                 </div>
                 <div className="row-between">
-                  <span className="soft">Local NIM Container URL</span>
-                  <span className="mono">{health.model_driver.local_nim_url}</span>
-                </div>
-                <div className="row-between">
-                  <span className="soft">Local NIM Status</span>
-                  <span className={health.model_driver.local_nim_available ? 'text-success' : 'soft'}>
-                    {health.model_driver.local_nim_available ? 'REACHABLE (Active Local NIM)' : 'UNREACHABLE'}
+                  <span className="soft">Endpoint Status</span>
+                  <span className={health.model_driver.endpoint_available ? 'text-success' : 'soft'}>
+                    {health.model_driver.endpoint_available ? 'REACHABLE (Live Cosmos inference)' : 'UNREACHABLE'}
                   </span>
                 </div>
               </div>
