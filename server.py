@@ -126,11 +126,17 @@ class CosmosModelDriver:
         
         if category in ('Pallet_BagFlap', 'Pallet_LPN'):
             prompt = (
-                f"You are a physical AI agent inspecting a agricultural product pallet flap or label. "
-                f"Locate and read the batch code printed on the label/flap. "
-                f"The expected batch codes are: [{batches_str}]. "
-                f"Verify if the printed batch code matches one of the expected batch codes. "
-                f"If the text is slightly distorted, apply OCR error correction to map it to the closest match."
+                f"You are a physical AI agent inspecting an agricultural product bag flap or label. "
+                f"The label has a known layout: the BATCH CODE is printed ABOVE the material/product "
+                f"description. The batch code is a compact alphanumeric code (letters and digits mixed, "
+                f"roughly 8-9 characters, e.g. 'P18GY43M8'); the material description below it is "
+                f"longer human-readable product text — do NOT report the material description or any "
+                f"part of it as the batch code. "
+                f"The expected batch codes for this pallet are: [{batches_str}]. "
+                f"Read the batch code character by character, then check it against the expected list. "
+                f"If the printed code is slightly distorted, apply OCR error correction to map it to "
+                f"the closest expected code (e.g. 0/O, 1/I, 8/B confusions). If no batch code is "
+                f"visible at all, return null rather than substituting other text."
             )
             schema = {
                 "detectedBatchCode": "string (the extracted batch code)",
@@ -258,9 +264,16 @@ class CosmosModelDriver:
             
         elif category == 'Returns_Damage_Assessment':
             prompt = (
-                "You are an AI returns inspector. Analyze this photo of a returned product pallet. "
-                "Scan specifically for any visible DAMAGE: hit by forklift, smashed into another pallet, "
-                "leaking seed, mouse holes, torn bags, or water damage."
+                "You are an AI returns inspector analyzing a photo of a returned product pallet. "
+                "Most returned pallets are NOT damaged — normal wrinkles, folds, printed graphics, "
+                "shrink wrap reflections, shadows, dust, or slightly slumped stacking are NORMAL and "
+                "must be reported as no damage. "
+                "Report damageDetected=true ONLY if you can point to clear physical evidence of one of "
+                "these specific problems: a puncture or tear exposing the contents, seed visibly "
+                "spilling/leaking, crush damage from a forklift or another pallet (deformed/flattened "
+                "bags), chewed holes from rodents, or water staining/saturation. "
+                "If you are not confident the damage is real, set damageDetected=false and "
+                "damageDescription='Clean'."
             )
             schema = {
                 "damageDetected": "boolean",
