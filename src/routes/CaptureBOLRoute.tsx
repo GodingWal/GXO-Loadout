@@ -12,6 +12,7 @@ export function CaptureBOLRoute() {
   const navigate = useNavigate();
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [pages, setPages] = useState<InspectionPhoto[]>([]);
   const [pending, setPending] = useState<{
     blob: Blob;
     previewUrl: string;
@@ -76,12 +77,16 @@ export function CaptureBOLRoute() {
       });
       photo.mlResults = mlResults;
 
+      // Merge this page's extraction into the BOL accumulated from earlier
+      // pages: header fields are kept from the first page that has them
+      // (later pages of a multi-page BOL often lack the header), and
+      // deliveries are merged by delivery number across pages.
       const fields = mlResults.bolFields;
       const updatedBOL = { ...inspection.bol };
       updatedBOL.photoIds = [...updatedBOL.photoIds, photo.id];
 
       if (fields) {
-        if (fields.loadNumber) {
+        if (fields.loadNumber && !updatedBOL.loadNumber?.value) {
           updatedBOL.loadNumber = {
             value: fields.loadNumber,
             source: 'manual',
@@ -89,7 +94,7 @@ export function CaptureBOLRoute() {
             mlConfidence: fields.confidence,
           } as Suggestable<string>;
         }
-        if (fields.shipDate) {
+        if (fields.shipDate && !updatedBOL.shipDate?.value) {
           updatedBOL.shipDate = {
             value: fields.shipDate,
             source: 'manual',
@@ -98,18 +103,31 @@ export function CaptureBOLRoute() {
           } as Suggestable<string>;
         }
         if (fields.numberOfStops !== undefined) {
-          updatedBOL.numberOfStops = fields.numberOfStops;
+          updatedBOL.numberOfStops = Math.max(updatedBOL.numberOfStops || 0, fields.numberOfStops);
         }
-        if (fields.carrier) {
+        if (fields.carrier && !updatedBOL.carrier) {
           updatedBOL.carrier = fields.carrier;
         }
         if (fields.deliveries && fields.deliveries.length > 0) {
-          updatedBOL.deliveries = fields.deliveries.map((d) => ({
-            id: crypto.randomUUID(),
-            deliveryNumber: d.deliveryNumber || '',
-            stopNumber: d.stopNumber,
-            lineItemIds: [],
-          })) as Delivery[];
+          const existing: Delivery[] = updatedBOL.deliveries || [];
+          const merged = [...existing];
+          for (const d of fields.deliveries) {
+            const num = d.deliveryNumber || '';
+            const already = num && merged.find((m) => m.deliveryNumber === num);
+            if (already) {
+              if (already.stopNumber === undefined && d.stopNumber !== undefined) {
+                already.stopNumber = d.stopNumber;
+              }
+            } else {
+              merged.push({
+                id: crypto.randomUUID(),
+                deliveryNumber: num,
+                stopNumber: d.stopNumber,
+                lineItemIds: [],
+              } as Delivery);
+            }
+          }
+          updatedBOL.deliveries = merged;
         }
       }
 
@@ -119,8 +137,8 @@ export function CaptureBOLRoute() {
         lastEditedAt: new Date().toISOString(),
       };
       await dbSaveInspection(updated);
-      // BOL done, go to picklist
-      navigate(`/inspection/${inspection.id}/capture-picklist`);
+      setInspection(updated);
+      setPages((p) => [...p, photo]);
     } finally {
       setAnalyzing(false);
     }
@@ -160,31 +178,63 @@ export function CaptureBOLRoute() {
         </div>
       </div>
 
-      <div
-        style={{
-          aspectRatio: '4 / 3',
-          background: 'var(--surface-tint)',
-          border: '2px dashed var(--rule-soft)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: 20,
-          padding: 24,
-        }}
-      >
-        <div style={{ fontSize: 48, color: 'var(--ink-faint)', marginBottom: 8 }}>⌗</div>
-        <div className="small soft">
-          {analyzing ? 'Analyzing BOL…' : 'No photo yet'}
+      {pages.length === 0 ? (
+        <div
+          style={{
+            aspectRatio: '4 / 3',
+            background: 'var(--surface-tint)',
+            border: '2px dashed var(--rule-soft)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 20,
+            padding: 24,
+          }}
+        >
+          <div style={{ fontSize: 48, color: 'var(--ink-faint)', marginBottom: 8 }}>⌗</div>
+          <div className="small soft">
+            {analyzing ? 'Analyzing BOL page…' : 'No pages yet'}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="photo-grid" style={{ marginBottom: 20 }}>
+          {pages.map((p, idx) => (
+            <div key={p.id} className="photo-tile">
+              <img src={p.localBlobUrl} alt={`BOL page ${idx + 1}`} />
+              <div className="photo-slot__label-overlay">Page {idx + 1}</div>
+              {p.mlResults?.source === 'mock' && (
+                <div
+                  className="photo-tile__badge"
+                  style={{ background: 'var(--warn, #b45309)', color: '#fff' }}
+                >
+                  ⚠ MOCK DATA
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {pages.length > 0 && (
+        <div className="banner banner--info" style={{ marginBottom: 12 }}>
+          <span className="banner__icon">✓</span>
+          <div className="banner__body">
+            {pages.length} page{pages.length > 1 ? 's' : ''} captured ·{' '}
+            {inspection.bol.deliveries?.length || 0} deliver
+            {(inspection.bol.deliveries?.length || 0) === 1 ? 'y' : 'ies'} ·{' '}
+            {inspection.bol.numberOfStops || 0} stop{(inspection.bol.numberOfStops || 0) === 1 ? '' : 's'}
+            {inspection.bol.loadNumber?.value ? ` · Load ${inspection.bol.loadNumber.value}` : ''}
+          </div>
+        </div>
+      )}
 
       <div className="banner banner--info">
         <span className="banner__icon">i</span>
         <div className="banner__body">
-          Photograph the BOL first — it determines how many stops and deliveries are on this
-          load. AI will extract the Load #, ship date, stop count, and delivery numbers. The
-          picklist comes next.
+          Photograph every page of the BOL — it determines how many stops and deliveries are
+          on this load. AI extracts the Load #, ship date, stop count, and delivery numbers
+          and merges them across pages. The picklist comes next.
         </div>
       </div>
 
@@ -194,8 +244,19 @@ export function CaptureBOLRoute() {
         disabled={analyzing}
         style={{ width: '100%' }}
       >
-        📷 Take photo
+        {analyzing ? 'Analyzing…' : pages.length === 0 ? '📷 Take photo' : '📷 Add another page'}
       </button>
+
+      {pages.length > 0 && (
+        <button
+          className="btn btn--lg mt-16"
+          onClick={skipToPicklist}
+          disabled={analyzing}
+          style={{ width: '100%' }}
+        >
+          Done — continue to picklist →
+        </button>
+      )}
 
       <div className="center mt-16">
         <button className="btn btn--ghost" onClick={skipToPicklist}>

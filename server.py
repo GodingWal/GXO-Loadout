@@ -186,6 +186,9 @@ class CosmosModelDriver:
         elif category == 'BOL':
             prompt = (
                 "Extract the Bill of Lading (BOL) logistics details from this document. "
+                "NOTE: this photo may be ONE PAGE of a multi-page BOL — extract only what is "
+                "printed on THIS page and return null for fields that do not appear on it "
+                "(results are merged across pages later). "
                 "This BOL has a known layout — use it:\n"
                 "1. BOL NUMBER: in the TOP-RIGHT corner of the page there is a box labelled "
                 "'BOL/CMR Number'. The value printed underneath that label is the BOL/load number — "
