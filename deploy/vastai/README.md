@@ -15,11 +15,33 @@
 - `backup.sh` — nightly cron backup of `loadout.db` + `uploads/`; set
   `BACKUP_REMOTE` (rsync destination) or `BACKUP_RCLONE` to ship archives off the
   box — Vast instances are ephemeral, don't keep the only copy there
+- `tunnel.sh` — public internet access via Cloudflare Tunnel (see below)
 - `onstart.sh` — vLLM-only on-start script for the split setup below
 
 **Security note:** both services bind to `127.0.0.1` only — access is via the SSH
 tunnel. Set `HOST=0.0.0.0` on the app only if you intentionally expose it (and put
 auth/TLS in front; the API itself is unauthenticated).
+
+## Public access (Cloudflare Tunnel)
+
+The app has **no built-in login**, so never expose port 8080 directly. Instead:
+
+1. **Test drive (2 minutes, no account):** on the server run
+   `bash deploy/vastai/tunnel.sh` — it prints a temporary public
+   `https://*.trycloudflare.com` URL. Unauthenticated; the URL changes each
+   restart. Testing only.
+2. **Production:**
+   - Create a free Cloudflare account and add a domain you own.
+   - In [Cloudflare Zero Trust](https://one.dash.cloudflare.com) →
+     **Networks → Tunnels → Create a tunnel** (cloudflared connector), copy the
+     token, and add a **Public Hostname** (e.g. `loadout.yourdomain.com`)
+     routed to `http://localhost:8080`.
+   - On the server: `CLOUDFLARE_TUNNEL_TOKEN=<token> bash deploy/vastai/tunnel.sh`
+     The token is persisted and `run_services.sh` restarts the tunnel after
+     instance reboots.
+   - **Required:** in Zero Trust → **Access → Applications**, add a self-hosted
+     application for the hostname with a policy (e.g. allowed email addresses,
+     one-time PIN, or Google login). This is the login gate for the site.
 
 **Measuring accuracy:** once live, build a labeled set of real photos and run
 `python3 scripts/eval.py --data eval_data --server http://127.0.0.1:8080` to get

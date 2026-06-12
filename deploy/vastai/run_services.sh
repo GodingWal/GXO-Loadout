@@ -24,4 +24,9 @@ tmux new-session -d -s loadout \
   "cd '$APP_DIR' && PORT=$APP_PORT COSMOS_ENDPOINT=http://127.0.0.1:$VLLM_PORT/v1 \
    python3 server.py 2>&1 | tee /var/log/gxo-loadout.log"
 
+# Restart the Cloudflare tunnel if one was configured (see tunnel.sh)
+if [ -s /root/.gxo-tunnel-token ] && [ -f "$APP_DIR/deploy/vastai/tunnel.sh" ]; then
+  bash "$APP_DIR/deploy/vastai/tunnel.sh"
+fi
+
 echo "Services starting. Logs: tmux attach -t cosmos | tmux attach -t loadout"
