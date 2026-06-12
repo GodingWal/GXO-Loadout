@@ -180,9 +180,14 @@ class CosmosModelDriver:
         elif category == 'BOL':
             prompt = (
                 "Extract the Bill of Lading (BOL) logistics details. "
-                "Read the Load Number, Ship Date (format YYYY-MM-DD), Carrier name, and total number of stops. "
-                "Map each delivery (containing delivery number and stop number) to its line items "
-                "(batch code, product name, expected quantity, and UOM)."
+                "Work in two passes. PASS 1 — header: scan the top section of the document for the "
+                "Load Number (a long numeric ID, often labelled 'Load', 'Load #' or 'Shipment'), the "
+                "Ship Date (convert to YYYY-MM-DD), the Carrier name (often near 'Carrier' or 'SCAC'), "
+                "and the total number of stops. PASS 2 — line items: read the main table row by row, top "
+                "to bottom. Each row has a batch/lot code, product name, quantity, and UOM. Rows are "
+                "grouped under delivery/stop headings — assign each row to the delivery heading above it. "
+                "Transcribe ONLY rows that are actually printed: do not invent, merge, or repeat rows. "
+                "If a value is unreadable or absent, use null rather than guessing."
             )
             schema = {
                 "loadNumber": "string",
@@ -270,7 +275,11 @@ class CosmosModelDriver:
         except Exception:
             return False
 
-    def _run_remote(self, image_bytes: bytes, prompt: str, schema: dict) -> dict:
+    # Document categories produce large JSON (many table rows) and need a
+    # bigger output budget so the JSON isn't truncated mid-stream.
+    _DOCUMENT_CATEGORIES = {'BOL', 'Picklist', 'Pallet_Placard', 'Returns_BOL', 'CoverSheet'}
+
+    def _run_remote(self, image_bytes: bytes, prompt: str, schema: dict, max_tokens: int = 1024) -> dict:
         base64_image = base64.b64encode(image_bytes).decode('utf-8')
         headers = {"Content-Type": "application/json"}
         if self.api_key:
@@ -293,8 +302,8 @@ class CosmosModelDriver:
                     ]
                 }
             ],
-            "max_tokens": 1024,
-            "temperature": 0.1,
+            "max_tokens": max_tokens,
+            "temperature": 0.0,
             # JSON mode (guided decoding) guarantees syntactically valid JSON output
             "response_format": {"type": "json_object"}
         }
@@ -470,7 +479,8 @@ class CosmosModelDriver:
 
         try:
             if self.endpoint:
-                result = self._validate_and_wrap(category, self._run_remote(image_bytes, prompt, schema))
+                max_tokens = 4096 if category in self._DOCUMENT_CATEGORIES else 1024
+                result = self._validate_and_wrap(category, self._run_remote(image_bytes, prompt, schema, max_tokens))
                 result.setdefault("analyzedAt", now)
                 result.setdefault("modelVersions", {"cosmos_vlm": self.model_name})
                 result["source"] = "live"

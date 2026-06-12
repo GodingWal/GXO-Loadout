@@ -22,18 +22,22 @@ export async function preloadOCR(): Promise<void> {
 }
 
 // Downscale a photo before upload — phone captures are 4–12 MB but the VLM
-// doesn't need more than ~1600px on the long edge, and smaller uploads cut
-// round-trip latency substantially.
+// doesn't need more than ~1600px on the long edge for pallet shots. Document
+// photos (BOL, picklists, placards) keep more resolution so fine print
+// survives.
 const MAX_UPLOAD_DIMENSION = 1600;
+const MAX_DOCUMENT_DIMENSION = 2560;
+const DOCUMENT_CATEGORIES: PhotoCategory[] = ['BOL', 'Picklist', 'Pallet_Placard', 'Returns_BOL', 'CoverSheet'];
 const UPLOAD_JPEG_QUALITY = 0.85;
 
-async function downscaleForUpload(blob: Blob): Promise<Blob> {
+async function downscaleForUpload(blob: Blob, category: PhotoCategory): Promise<Blob> {
+  const maxDim = DOCUMENT_CATEGORIES.includes(category) ? MAX_DOCUMENT_DIMENSION : MAX_UPLOAD_DIMENSION;
   try {
     const bitmap = await createImageBitmap(blob);
     const longEdge = Math.max(bitmap.width, bitmap.height);
-    if (longEdge <= MAX_UPLOAD_DIMENSION) return blob;
+    if (longEdge <= maxDim) return blob;
 
-    const scale = MAX_UPLOAD_DIMENSION / longEdge;
+    const scale = maxDim / longEdge;
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(bitmap.width * scale);
     canvas.height = Math.round(bitmap.height * scale);
@@ -58,7 +62,7 @@ export async function analyzePhoto(req: MLAnalysisRequest): Promise<PhotoMLResul
   const now = new Date().toISOString();
 
   try {
-    const uploadBlob = await downscaleForUpload(req.photoBlob);
+    const uploadBlob = await downscaleForUpload(req.photoBlob, req.category);
     const formData = new FormData();
     formData.append('file', uploadBlob, 'photo.jpg');
     formData.append('category', req.category);
