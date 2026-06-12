@@ -1,5 +1,12 @@
 # Running Cosmos inference on Vast.ai
 
+> **Single-box quick start:** to run *everything* (Cosmos via vLLM **and** the
+> website) on one Vast.ai GPU server, SSH in and run
+> `bash deploy/vastai/setup_server.sh`. It serves the app on port 8080 —
+> reach it through your SSH tunnel (`ssh -p <port> root@<ip> -L 8080:localhost:8080`,
+> then open http://localhost:8080). The rest of this doc covers the split
+> setup (GPU on Vast, app elsewhere).
+
 The GXO Loadout edge server (`server.py`) no longer runs the model itself. All
 vision tasks (bag counting, batch-code OCR, picklist/BOL extraction, damage
 assessment) are sent to an OpenAI-compatible endpoint defined by
