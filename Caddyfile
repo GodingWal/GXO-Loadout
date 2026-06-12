@@ -1,0 +1,4 @@
+:8443 {
+    reverse_proxy loadout:8000
+    tls internal
+}

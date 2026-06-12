@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  loadout:
+    build: .
+    container_name: gxo-loadout-edge-server
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000" # Keep port 8000 mapped for direct HTTP testing if desired
+    environment:
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - COSMOS_LOCAL_GPU=${COSMOS_LOCAL_GPU:-false}
+      - COSMOS_LOCAL_NIM_URL=${COSMOS_LOCAL_NIM_URL:-http://localhost:8008/v1}
+      - COSMOS_MODEL_NAME=${COSMOS_MODEL_NAME:-nvidia/cosmos-1.0-reasoning-2b-chat}
+      - USE_HTTPS=false # FastAPI runs on plain HTTP internally, Caddy handles HTTPS externally
+    volumes:
+      - ./uploads:/app/uploads
+      - ./loadout.db:/app/loadout.db
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: gxo-loadout-https-proxy
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - loadout
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
