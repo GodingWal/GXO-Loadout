@@ -9,14 +9,14 @@
 #
 # Layout:
 #   - vLLM serving nvidia/Cosmos-Reason1-7B on localhost:8001 (GPU)
-#   - GXO Loadout FastAPI + built frontend on port 8080
-# Access the site via the SSH tunnel:  ssh -p <port> root@<ip> -L 8080:localhost:8080
+#   - GXO Loadout FastAPI + built frontend on port 8081
+# Access the site via the SSH tunnel:  ssh -p <port> root@<ip> -L 8081:localhost:8081
 set -e
 
 REPO_URL="${REPO_URL:-https://github.com/GodingWal/GXO-Loadout.git}"
 BRANCH="${BRANCH:-main}"
 APP_DIR="${APP_DIR:-/opt/gxo-loadout}"
-APP_PORT="${APP_PORT:-8080}"
+APP_PORT="${APP_PORT:-8081}"
 VLLM_PORT="${VLLM_PORT:-8001}"
 MODEL="${COSMOS_MODEL_NAME:-nvidia/Cosmos-Reason1-7B}"
 

@@ -16,7 +16,7 @@
 #      changes on every restart.
 set -e
 
-APP_PORT="${APP_PORT:-8080}"
+APP_PORT="${APP_PORT:-8081}"
 TOKEN_FILE=/root/.gxo-tunnel-token
 
 if ! command -v cloudflared >/dev/null; then

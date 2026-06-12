@@ -21,7 +21,7 @@ Dataset layout (one directory per case):
 Each key in "expected" is compared against the (flattened) analysis response.
 
 Usage:
-    python3 scripts/eval.py --data eval_data [--server http://127.0.0.1:8080]
+    python3 scripts/eval.py --data eval_data [--server http://127.0.0.1:8081]
 """
 import argparse
 import json
@@ -53,7 +53,7 @@ def compare(expected, actual):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--data", required=True, help="Path to the labeled eval dataset directory")
-    ap.add_argument("--server", default="http://127.0.0.1:8080", help="Edge server base URL")
+    ap.add_argument("--server", default="http://127.0.0.1:8081", help="Edge server base URL")
     ap.add_argument("--verbose", action="store_true", help="Print every field comparison")
     args = ap.parse_args()
 

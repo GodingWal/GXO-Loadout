@@ -5,7 +5,7 @@
 set -e
 
 APP_DIR="${APP_DIR:-/opt/gxo-loadout}"
-APP_PORT="${APP_PORT:-8080}"
+APP_PORT="${APP_PORT:-8081}"
 VLLM_PORT="${VLLM_PORT:-8001}"
 MODEL="${COSMOS_MODEL_NAME:-nvidia/Cosmos-Reason1-7B}"
 export HF_HOME="${HF_HOME:-/opt/hf-cache}"   # keep model weights out of /tmp

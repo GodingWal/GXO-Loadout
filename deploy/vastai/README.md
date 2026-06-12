@@ -2,9 +2,9 @@
 
 > **Single-box quick start:** to run *everything* (Cosmos via vLLM **and** the
 > website) on one Vast.ai GPU server, SSH in and run
-> `bash deploy/vastai/setup_server.sh`. It serves the app on port 8080 —
-> reach it through your SSH tunnel (`ssh -p <port> root@<ip> -L 8080:localhost:8080`,
-> then open http://localhost:8080). The rest of this doc covers the split
+> `bash deploy/vastai/setup_server.sh`. It serves the app on port 8081 —
+> reach it through your SSH tunnel (`ssh -p <port> root@<ip> -L 8081:localhost:8081`,
+> then open http://localhost:8081). The rest of this doc covers the split
 > setup (GPU on Vast, app elsewhere).
 
 ## Files in this directory
@@ -24,7 +24,7 @@ auth/TLS in front; the API itself is unauthenticated).
 
 ## Public access (Cloudflare Tunnel)
 
-The app has **no built-in login**, so never expose port 8080 directly. Instead:
+The app has **no built-in login**, so never expose port 8081 directly. Instead:
 
 1. **Test drive (2 minutes, no account):** on the server run
    `bash deploy/vastai/tunnel.sh` — it prints a temporary public
@@ -35,7 +35,7 @@ The app has **no built-in login**, so never expose port 8080 directly. Instead:
    - In [Cloudflare Zero Trust](https://one.dash.cloudflare.com) →
      **Networks → Tunnels → Create a tunnel** (cloudflared connector), copy the
      token, and add a **Public Hostname** (e.g. `loadout.yourdomain.com`)
-     routed to `http://localhost:8080`.
+     routed to `http://localhost:8081`.
    - On the server: `CLOUDFLARE_TUNNEL_TOKEN=<token> bash deploy/vastai/tunnel.sh`
      The token is persisted and `run_services.sh` restarts the tunnel after
      instance reboots.
@@ -44,7 +44,7 @@ The app has **no built-in login**, so never expose port 8080 directly. Instead:
      one-time PIN, or Google login). This is the login gate for the site.
 
 **Measuring accuracy:** once live, build a labeled set of real photos and run
-`python3 scripts/eval.py --data eval_data --server http://127.0.0.1:8080` to get
+`python3 scripts/eval.py --data eval_data --server http://127.0.0.1:8081` to get
 per-category accuracy (see the docstring in `scripts/eval.py` for the layout).
 
 The GXO Loadout edge server (`server.py`) no longer runs the model itself. All
