@@ -12,16 +12,27 @@ export HF_HOME="${HF_HOME:-/opt/hf-cache}"   # keep model weights out of /tmp
 
 mkdir -p "$HF_HOME" /var/log
 
+# Optional fine-tuned LoRA adapter (see training/README.md): serve it under
+# the name "tuned" and make the app request that model.
+APP_MODEL="$MODEL"
+LORA_ARGS=""
+if [ -n "$LORA_DIR" ] && [ -d "$LORA_DIR" ]; then
+  LORA_ARGS="--enable-lora --lora-modules tuned=$LORA_DIR"
+  APP_MODEL="tuned"
+  echo "Serving LoRA adapter from $LORA_DIR as model 'tuned'"
+fi
+
 tmux kill-session -t cosmos 2>/dev/null || true
 tmux new-session -d -s cosmos \
   "HF_HOME='$HF_HOME' python3 -m vllm.entrypoints.openai.api_server \
      --model '$MODEL' --host 127.0.0.1 --port $VLLM_PORT \
-     --max-model-len 8192 --gpu-memory-utilization 0.85 \
+     --max-model-len 8192 --gpu-memory-utilization 0.85 $LORA_ARGS \
      2>&1 | tee /var/log/cosmos-vllm.log"
 
 tmux kill-session -t loadout 2>/dev/null || true
 tmux new-session -d -s loadout \
   "cd '$APP_DIR' && PORT=$APP_PORT COSMOS_ENDPOINT=http://127.0.0.1:$VLLM_PORT/v1 \
+   COSMOS_MODEL_NAME='$APP_MODEL' \
    python3 server.py 2>&1 | tee /var/log/gxo-loadout.log"
 
 # Restart the Cloudflare tunnel if one was configured (see tunnel.sh)
