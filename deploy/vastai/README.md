@@ -35,7 +35,7 @@ The app has **no built-in login**, so never expose port 8081 directly. Instead:
    - In [Cloudflare Zero Trust](https://one.dash.cloudflare.com) →
      **Networks → Tunnels → Create a tunnel** (cloudflared connector), copy the
      token, and add a **Public Hostname** (e.g. `loadout.yourdomain.com`)
-     routed to `http://localhost:8081`.
+     routed to `http://127.0.0.1:8081` (use the IPv4 address, not `localhost`).
    - On the server: `CLOUDFLARE_TUNNEL_TOKEN=<token> bash deploy/vastai/tunnel.sh`
      The token is persisted and `run_services.sh` restarts the tunnel after
      instance reboots.

@@ -38,12 +38,12 @@ if [ -s "$TOKEN_FILE" ]; then
   tmux new-session -d -s tunnel \
     "cloudflared tunnel run --token $(cat $TOKEN_FILE) 2>&1 | tee /var/log/cloudflared.log"
   echo "Tunnel running. The site is served at the public hostname configured in"
-  echo "Cloudflare Zero Trust (route it to http://localhost:$APP_PORT)."
+  echo "Cloudflare Zero Trust (route it to http://127.0.0.1:$APP_PORT)."
   echo "REMINDER: protect the hostname with a Cloudflare Access policy."
 else
   echo "==> No CLOUDFLARE_TUNNEL_TOKEN — starting a TEMPORARY quick tunnel..."
   tmux new-session -d -s tunnel \
-    "cloudflared tunnel --url http://localhost:$APP_PORT 2>&1 | tee /var/log/cloudflared.log"
+    "cloudflared tunnel --url http://127.0.0.1:$APP_PORT 2>&1 | tee /var/log/cloudflared.log"
   echo "Waiting for the public URL..."
   for i in $(seq 1 30); do
     URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' /var/log/cloudflared.log 2>/dev/null | head -1 || true)
