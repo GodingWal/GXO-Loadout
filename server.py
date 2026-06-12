@@ -179,15 +179,24 @@ class CosmosModelDriver:
             
         elif category == 'BOL':
             prompt = (
-                "Extract the Bill of Lading (BOL) logistics details. "
-                "Work in two passes. PASS 1 — header: scan the top section of the document for the "
-                "Load Number (a long numeric ID, often labelled 'Load', 'Load #' or 'Shipment'), the "
-                "Ship Date (convert to YYYY-MM-DD), the Carrier name (often near 'Carrier' or 'SCAC'), "
-                "and the total number of stops. PASS 2 — line items: read the main table row by row, top "
-                "to bottom. Each row has a batch/lot code, product name, quantity, and UOM. Rows are "
-                "grouped under delivery/stop headings — assign each row to the delivery heading above it. "
-                "Transcribe ONLY rows that are actually printed: do not invent, merge, or repeat rows. "
-                "If a value is unreadable or absent, use null rather than guessing."
+                "Extract the Bill of Lading (BOL) logistics details from this document. "
+                "This BOL has a known layout — use it:\n"
+                "1. BOL NUMBER: in the TOP-RIGHT corner of the page there is a box labelled "
+                "'BOL/CMR Number'. The value printed underneath that label is the BOL/load number — "
+                "a 9-digit number similar to 835816263. Report it as loadNumber. Read it digit by "
+                "digit; do not take a number from anywhere else on the page.\n"
+                "2. STOPS AND DELIVERIES: there is a separate box titled 'Deliveries per Shipment' "
+                "containing text like 'Stop 1 of 1' or 'Stop 2 of 3' together with the delivery "
+                "number(s) for each stop. From this box read: the total number of stops "
+                "(the 'of N' value -> numberOfStops), each stop's number, and each delivery number "
+                "exactly as printed. Every delivery in the output MUST have its deliveryNumber taken "
+                "from this box — never leave it null if the box is legible.\n"
+                "3. HEADER: also read the Ship Date (convert to YYYY-MM-DD) and the Carrier name from "
+                "the header area.\n"
+                "4. LINE ITEMS: read the main table row by row, top to bottom. Each row has a "
+                "batch/lot code, product name, quantity, and UOM. Assign each row to the delivery it "
+                "is grouped under. Transcribe ONLY rows that are actually printed: do not invent, "
+                "merge, or repeat rows. If a value is genuinely unreadable, use null rather than guessing."
             )
             schema = {
                 "loadNumber": "string",
