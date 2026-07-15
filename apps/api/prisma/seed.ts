@@ -82,8 +82,7 @@ async function main() {
   console.log(`Successfully seeded ${lanesToCreate.length} precise staging lanes!`);
 
   // ─── DockX: Doors ──────────────────────────────────────────
-  await prisma.door.createMany({
-    skipDuplicates: true,
+  await prisma.door.createMany({
     data: [
       { id: 1, name: 'Door 1', direction: 'Inbound', status: 'Open' },
       { id: 2, name: 'Door 2', direction: 'Inbound', status: 'Open' },
@@ -95,8 +94,7 @@ async function main() {
   console.log('Seeded doors.');
 
   // ─── DockX: Operators ──────────────────────────────────────
-  await prisma.operator.createMany({
-    skipDuplicates: true,
+  await prisma.operator.createMany({
     data: [
       { id: 1, name: 'Mike Thompson' },
       { id: 2, name: 'Sarah Garcia' },
@@ -106,8 +104,7 @@ async function main() {
   console.log('Seeded operators.');
 
   // ─── Operations-Hub: Employees ─────────────────────────────
-  await prisma.employee.createMany({
-    skipDuplicates: true,
+  await prisma.employee.createMany({
     data: [
       { id: 1, fullName: 'Alice Johnson', firstName: 'Alice', lastName: 'Johnson', email: 'ajohnson@gxo.com', shift: '1st', jobRole: 'CSR/Clerk', hireDate: '2023-01-15', active: true, phoneNumber: '(507) 555-0101', shirtSize: 'M' },
       { id: 2, fullName: 'Bob Williams', firstName: 'Bob', lastName: 'Williams', email: 'bwilliams@gxo.com', shift: '2nd', jobRole: 'Inventory', hireDate: '2022-08-20', active: true, phoneNumber: '(507) 555-0102', cwid: 'CW-1002' },
@@ -122,8 +119,7 @@ async function main() {
   console.log('Seeded employees.');
 
   // ─── Operations-Hub: Skills ────────────────────────────────
-  await prisma.skill.createMany({
-    skipDuplicates: true,
+  await prisma.skill.createMany({
     data: [
       { id: 1, name: 'Inbound - Verification', jobRoles: JSON.stringify(['CSR/Clerk', 'Lead']), process: 'Inbound', action: 'Verify incoming shipments against manifests and system records' },
       { id: 2, name: 'Inbound - Putaway', jobRoles: JSON.stringify(['Inventory', 'PIT', 'Lead']), process: 'Inbound', action: 'Move received goods to assigned storage locations' },
@@ -140,8 +136,7 @@ async function main() {
   console.log('Seeded skills.');
 
   // ─── Operations-Hub: Ratings ───────────────────────────────
-  await prisma.employeeSkillRating.createMany({
-    skipDuplicates: true,
+  await prisma.employeeSkillRating.createMany({
     data: [
       { id: 1, employeeId: 1, skill: 'Inbound - Verification', rating: 4, dateAssessed: '2024-02-15', assessedBy: 'System' },
       { id: 2, employeeId: 1, skill: 'Outbound - Picking', rating: 3, dateAssessed: '2024-01-10', assessedBy: 'System' },
@@ -169,8 +164,7 @@ async function main() {
   console.log('Seeded ratings.');
 
   // ─── Operations-Hub: Coaching ──────────────────────────────
-  await prisma.coaching.createMany({
-    skipDuplicates: true,
+  await prisma.coaching.createMany({
     data: [
       { id: 1, employeeId: 7, title: 'Attendance improvement', notes: 'Multiple late arrivals in March. Discussed importance of punctuality.', status: 'Open', dateOpened: '2024-03-15' },
       { id: 2, employeeId: 4, title: 'Putaway accuracy', notes: 'Several misplacements noted. Extra training scheduled.', status: 'Open', dateOpened: '2024-04-05' },
@@ -180,8 +174,7 @@ async function main() {
   console.log('Seeded coaching.');
 
   // ─── Operations-Hub: Contacts ──────────────────────────────
-  await prisma.contact.createMany({
-    skipDuplicates: true,
+  await prisma.contact.createMany({
     data: [
       { id: 1, fullName: 'Sarah Chen', company: 'Bayer', role: 'Site Operations Manager', phone: '(507) 555-0201', email: 'sarah.chen@bayer.com', category: 'Bayer' },
       { id: 2, fullName: "Mike's Forklift Services", company: "Mike's Equipment", role: 'Service Technician', phone: '(507) 555-0202', email: 'service@mikesforklift.com', category: 'Vendor' },
@@ -192,8 +185,7 @@ async function main() {
   console.log('Seeded contacts.');
 
   // ─── Operations-Hub: Equipment ─────────────────────────────
-  await prisma.equipment.createMany({
-    skipDuplicates: true,
+  await prisma.equipment.createMany({
     data: [
       { id: 1, name: 'Forklift #3', type: 'Forklift', status: 'Available', serialNumber: 'FL-2024-03', lastInspected: '2026-06-01' },
       { id: 2, name: 'Reach Truck #12', type: 'Reach Truck', status: 'In Use', assignedToId: 4, serialNumber: 'RT-2023-12', lastInspected: '2026-06-10' },

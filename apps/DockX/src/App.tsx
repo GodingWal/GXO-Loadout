@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { StagingLanesMap, ontologyClient, KanbanBoard, KanbanColumnDef, KanbanCardDef, DashboardKPIBoxes, DashboardTabs } from '@gxo/semantic';
+import { StagingLanesMap, ontologyClient, KanbanBoard, KanbanColumnDef, KanbanCardDef, DashboardKPIBoxes, DashboardTabs, AppointmentObject } from '@gxo/semantic';
+import { OrderCreationModal } from './components/OrderCreationModal';
 
 export default function App() {
   const [view, setView] = useState<'dashboard' | 'schedule' | 'gate' | 'admin' | 'staging-map'>('dashboard');
   const [dashboardTab, setDashboardTab] = useState<'Inbound' | 'Outbound' | 'Return'>('Outbound');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [stats, setStats] = useState({ total: 0, checked_in: 0, completed: 0, late: 0, missed: 0, ib_count: 0, ob_count: 0 });
-  const [appointments, setAppointments] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<AppointmentObject[]>([]);
+  const [orderCreationAppt, setOrderCreationAppt] = useState<AppointmentObject | null>(null);
   const [metadata, setMetadata] = useState<any>({ customers: [], carriers: [], productTypes: [], doors: [], operators: [] });
   const [loading, setLoading] = useState(false);
 
@@ -179,8 +181,7 @@ export default function App() {
   const workflows: Record<string, KanbanColumnDef[]> = {
     Outbound: [
       { id: 'Order Creation', title: 'ORDER CREATION', colorTheme: 'yellow' },
-      { id: 'Picking', title: 'PICKING', colorTheme: 'blue' },
-      { id: 'Verification', title: 'VERIFICATION', colorTheme: 'purple' },
+      { id: 'Picking & Verification', title: 'PICKING & VERIFICATION', colorTheme: 'blue' },
       { id: 'Manifest', title: 'MANIFEST', colorTheme: 'gray' },
       { id: 'Final BOL', title: 'FINAL BOL', colorTheme: 'gray' },
       { id: 'Lane Audit', title: 'LANE AUDIT', colorTheme: 'red' },
@@ -213,14 +214,23 @@ export default function App() {
       colId = kanbanColumns[0].id;
     }
 
+    const tags: { label: string; color: string }[] = [
+      { label: appt.properties.type, color: appt.properties.type === 'Inbound' ? '#3b82f6' : '#10b981' }
+    ];
+    if (appt.properties.pickerName) {
+      tags.push({ label: `Picker: ${appt.properties.pickerName}`, color: '#3b82f6' }); // Blue
+    }
+    if (appt.properties.verifierName) {
+      tags.push({ label: `Verifier: ${appt.properties.verifierName}`, color: '#8b5cf6' }); // Purple
+    }
+
     return {
       id: appt.id.toString(),
       columnId: colId,
       title: `#${appt.properties.bolShipmentNo}`,
       subtitle: `Carrier: ${appt.properties.carrier} | Customer: ${appt.properties.customer}`,
-      statusTags: [
-        { label: appt.properties.type, color: appt.properties.type === 'Inbound' ? '#3b82f6' : '#10b981' }
-      ]
+      statusTags: tags,
+      onClick: colId === 'Order Creation' ? () => setOrderCreationAppt(appt) : undefined
     };
   });
 
@@ -254,6 +264,13 @@ export default function App() {
     setAppointments(prev => prev.map(a => a.id.toString() === cardId ? { ...a, properties: { ...a.properties, status: toColumnId } } : a));
     try {
       await ontologyClient.updateAppointment({ id: parseInt(cardId), status: toColumnId });
+      if (toColumnId === 'Picking & Verification') {
+        try {
+          await ontologyClient.createPitTask({ appointmentId: parseInt(cardId), type: 'Pick' });
+        } catch (e) {
+          // Task might already exist, safe to ignore
+        }
+      }
     } catch (err) {
       console.error(err);
       fetchDashboardData();
@@ -370,6 +387,39 @@ export default function App() {
 
             {/* KPI statistics cards based on Kanban columns */}
             <DashboardKPIBoxes kpis={dashboardKPIs} />
+
+            {orderCreationAppt && (
+              <OrderCreationModal 
+                appt={orderCreationAppt}
+                onClose={() => setOrderCreationAppt(null)}
+                onSave={async (_deliveries, _stops, _stagingLane) => {
+                  try {
+                    await ontologyClient.updateAppointment({
+                      id: orderCreationAppt.id,
+                      status: 'Picking & Verification' // Moves it to the next column
+                    });
+                    
+                    // Create PIT Task so it shows up in PitBoard
+                    try {
+                      await ontologyClient.createPitTask({
+                        appointmentId: orderCreationAppt.id,
+                        type: 'Pick'
+                      });
+                    } catch (pitErr) {
+                      console.log("PIT Task might already exist:", pitErr);
+                    }
+
+                    // Ideally, we'd also save the deliveries/stops to a new Load here.
+                    setAppointments(prev => prev.map(a => 
+                      a.id === orderCreationAppt.id ? { ...a, properties: { ...a.properties, status: 'Picking & Verification' } } : a
+                    ));
+                    setOrderCreationAppt(null);
+                  } catch (e) {
+                    console.error("Failed to release order:", e);
+                  }
+                }}
+              />
+            )}
 
             <DashboardTabs 
               tabs={[

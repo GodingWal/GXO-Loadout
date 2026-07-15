@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
-import { Wrench, Plus, Search, Trash2, Edit, X, User, Calendar, Tag } from "lucide-react";
+import { Wrench, Plus, Search, Trash2, Edit, X, User, Calendar, Tag, QrCode } from "lucide-react";
+import QRCode from "react-qr-code";
 import { SectionHead } from "../components/UI";
 import type { Equipment, Employee } from "../types";
 
@@ -21,6 +22,7 @@ export const EquipmentsPage = ({ equipments, employees, onSave, onDelete }: Prop
   // Edit/Create Modal State
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Equipment | null>(null);
+  const [qrEquipment, setQrEquipment] = useState<Equipment | null>(null);
 
   // Form State
   const [form, setForm] = useState<Omit<Equipment, 'id'>>({
@@ -239,6 +241,13 @@ export const EquipmentsPage = ({ equipments, employees, onSave, onDelete }: Prop
 
                 <div className="flex items-center justify-end border-t border-stone-100 pt-3 gap-2">
                   <button
+                    onClick={() => setQrEquipment(eq)}
+                    className="p-2 text-stone-600 hover:text-stone-900 hover:bg-stone-50 rounded-lg transition"
+                    title="Print QR Code"
+                  >
+                    <QrCode size={16} />
+                  </button>
+                  <button
                     onClick={() => handleOpenModal(eq)}
                     className="p-2 text-stone-600 hover:text-stone-900 hover:bg-stone-50 rounded-lg transition"
                     title="Edit asset"
@@ -382,6 +391,57 @@ export const EquipmentsPage = ({ equipments, employees, onSave, onDelete }: Prop
           </div>
         </div>
       )}
+
+      {/* QR Code Modal */}
+      {qrEquipment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm" onClick={() => setQrEquipment(null)}>
+          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden flex flex-col qr-modal" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-stone-100 flex items-center justify-between no-print">
+              <h3 className="font-serif text-lg text-stone-900">QR Code</h3>
+              <button onClick={() => setQrEquipment(null)} className="p-2 hover:bg-stone-100 rounded-full transition">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-8 flex flex-col items-center justify-center bg-white qr-print-area">
+              <div className="mb-4 text-center">
+                <div className="text-xl font-bold">{qrEquipment.name}</div>
+                <div className="text-stone-500">ID: {qrEquipment.serialNumber}</div>
+              </div>
+              <QRCode value={`${window.location.origin}/?view=inspections&equipmentId=${qrEquipment.serialNumber}`} size={200} />
+              <div className="mt-4 text-sm font-semibold uppercase tracking-wider text-stone-500">
+                Scan to Inspect
+              </div>
+            </div>
+            <div className="p-4 border-t border-stone-100 flex justify-end no-print">
+              <button
+                onClick={() => window.print()}
+                className="px-5 py-2.5 bg-stone-900 text-white rounded-full text-sm font-medium hover:bg-stone-800 transition flex items-center gap-2"
+              >
+                <QrCode size={16} />
+                Print QR Code
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          .qr-modal, .qr-modal * {
+            visibility: visible;
+          }
+          .qr-modal {
+            position: absolute;
+            left: 0;
+            top: 0;
+            box-shadow: none !important;
+          }
+          .no-print { display: none !important; }
+        }
+      `}</style>
     </div>
   );
 };

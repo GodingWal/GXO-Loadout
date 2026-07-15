@@ -5,6 +5,7 @@ import { dbGetInspection } from '@gxo/semantic';
 import { useInspection } from '@gxo/semantic';
 import type { Inspection, Suggestable } from '@gxo/semantic';
 import { SuggestableField } from '@gxo/semantic';
+import { ontologyClient } from '@gxo/semantic';
 
 export function VerifyRoute() {
   const { id } = useParams<{ id: string }>();
@@ -33,8 +34,27 @@ function VerifyInner({
 }) {
   const { inspection, dispatch } = useInspection(initial);
 
-  const confirm = () => {
+  const confirm = async () => {
     dispatch({ type: 'VERIFY_PICKLIST', verifiedBy: inspection.startedBy || 'unknown' });
+    
+    // Cross-reference: load numbers should match between picklist and BOL
+    const picklistLoad = inspection.picklist.loadNumber.value;
+    const bolLoad = inspection.bol.loadNumber.value;
+    const sharedLoadNumber = bolLoad || picklistLoad;
+
+    try {
+      const appts = await ontologyClient.getAppointments();
+      const match = appts.find(a => String(a.properties.bolShipmentNo) === String(sharedLoadNumber));
+      if (match) {
+        await ontologyClient.updateAppointment({
+          id: match.id,
+          verifierName: inspection.startedBy || 'unknown'
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to sync verifier to Kanban', err);
+    }
+    
     onVerified();
   };
 

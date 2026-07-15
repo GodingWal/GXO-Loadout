@@ -46,7 +46,17 @@ export default function App() {
     saveEquipment, removeEquipment,
   } = useData();
 
-  const [view, setView] = useState<Navigation>({ name: 'home' });
+  const [view, setView] = useState<Navigation>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const viewParam = params.get('view');
+      if (viewParam === 'inspections') {
+        const eqId = params.get('equipmentId');
+        return { name: 'inspections', defaultEquipmentId: eqId || undefined };
+      }
+    }
+    return { name: 'home' };
+  });
   const [empFormOpen, setEmpFormOpen] = useState(false);
   const [editingEmp, setEditingEmp] = useState<Employee | null>(null);
   const [skillFormOpen, setSkillFormOpen] = useState(false);
@@ -221,7 +231,7 @@ export default function App() {
             )}
 
             {view.name === 'inspections' && (
-              <InspectionsPage equipments={equipments} />
+              <InspectionsPage equipments={equipments} defaultEquipmentId={view.defaultEquipmentId} />
             )}
 
             {view.name === 'inventory' && (

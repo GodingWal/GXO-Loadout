@@ -50,7 +50,11 @@ export async function checkOutAppointmentAction(params: any) {
 export async function startPitTaskAction(params: any) {
   const { appointmentId, operatorName, type } = params;
   
-  // If task exists, update it to In Progress. Otherwise create it.
+  await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: { pickerName: operatorName, status: 'Picking & Verification' }
+  });
+
   const existing = await prisma.pitTask.findUnique({ where: { appointmentId } });
   if (existing) {
     return await prisma.pitTask.update({
@@ -68,8 +72,10 @@ export async function startPitTaskAction(params: any) {
 
 export async function createPitTaskAction(params: any) {
   const { appointmentId, type } = params;
-  return await prisma.pitTask.create({
-    data: {
+  return await prisma.pitTask.upsert({
+    where: { appointmentId },
+    update: { type: type || 'Inbound/outbound', status: 'Pending' },
+    create: {
       appointmentId, type: type || 'Inbound/outbound', status: 'Pending'
     }
   });

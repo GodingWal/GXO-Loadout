@@ -57,9 +57,28 @@ export function PitBoard() {
     }
   }
 
+  const workflows: Record<string, string[]> = {
+    Outbound: ['Order Creation', 'Picking & Verification', 'Manifest', 'Final BOL', 'Lane Audit', 'Load', 'Ship/GI'],
+    Inbound: ['Unload', 'Receive/PGR', 'Verify', 'Putaway'],
+    Return: ['Unload', 'Verify', 'PGR', 'Receive', 'Putaway']
+  };
+
   async function handleCompleteTask(apptId: number) {
     try {
       await ontologyClient.completePitTask({ appointmentId: apptId });
+      
+      // Auto-advance Kanban board
+      const appts = await ontologyClient.getAppointments();
+      const match = appts.find(a => a.id === apptId);
+      if (match) {
+        const typeFlow = workflows[match.properties.type] || workflows['Outbound'];
+        const currentIndex = typeFlow.indexOf(match.properties.status);
+        if (currentIndex !== -1 && currentIndex < typeFlow.length - 1) {
+          const nextStage = typeFlow[currentIndex + 1];
+          await ontologyClient.updateAppointment({ id: apptId, status: nextStage });
+        }
+      }
+
       fetchPitTasks();
     } catch (err: any) {
       alert(err.message);

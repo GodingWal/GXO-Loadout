@@ -21,9 +21,10 @@ export interface KanbanBoardProps {
   columns: KanbanColumnDef[];
   cards: KanbanCardDef[];
   onMoveCard: (cardId: string, toColumnId: string) => void;
+  onAddCard?: (columnId: string) => void;
 }
 
-export function KanbanBoard({ columns, cards, onMoveCard }: KanbanBoardProps) {
+export function KanbanBoard({ columns, cards, onMoveCard, onAddCard }: KanbanBoardProps) {
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
   const [dragOverColId, setDragOverColId] = useState<string | null>(null);
 
@@ -75,11 +76,23 @@ export function KanbanBoard({ columns, cards, onMoveCard }: KanbanBoardProps) {
             onDragLeave={(e) => handleDragLeave(e, col.id)}
             onDrop={(e) => handleDrop(e, col.id)}
           >
-            <div className="kanban-column-header">
-              <span>{col.title}</span>
-              <span className="opacity-75" style={{ fontSize: '11px', background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '12px' }}>
-                {colCards.length}
-              </span>
+            <div className="kanban-column-header d-flex justify-content-between align-items-center">
+              <div className="d-flex align-items-center gap-2">
+                <span>{col.title}</span>
+                <span className="opacity-75" style={{ fontSize: '11px', background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '12px' }}>
+                  {colCards.length}
+                </span>
+              </div>
+              {onAddCard && (
+                <button
+                  className="btn btn-sm text-white p-0 m-0 border-0 bg-transparent"
+                  onClick={() => onAddCard(col.id)}
+                  title="Add card"
+                  style={{ cursor: 'pointer' }}
+                >
+                  <i className="bi bi-plus-circle fs-6 opacity-75"></i>
+                </button>
+              )}
             </div>
             
             <div className="kanban-cards-container">

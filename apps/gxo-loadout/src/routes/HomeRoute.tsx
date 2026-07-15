@@ -105,6 +105,15 @@ export function HomeRoute() {
             </div>
             <div className="workflow-card__arrow">→</div>
           </Link>
+
+          <Link to="/inspection/new/discard" className="workflow-card">
+            <div className="workflow-card__type">Discard</div>
+            <div className="workflow-card__title">Discard product</div>
+            <div className="workflow-card__sub">
+              Remove damaged or expired product from inventory
+            </div>
+            <div className="workflow-card__arrow">→</div>
+          </Link>
         </div>
       </section>
 

@@ -97,7 +97,7 @@ export const ontologyClient = {
     await post('CheckOutAppointment', params);
   },
 
-  updateAppointment: async (params: { id: number; status?: string; doorName?: string }): Promise<void> => {
+  updateAppointment: async (params: { id: number; status?: string; doorName?: string; pickerName?: string; verifierName?: string }): Promise<void> => {
     await post('UpdateAppointment', params);
   },
 

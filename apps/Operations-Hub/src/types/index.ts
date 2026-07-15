@@ -70,7 +70,7 @@ export type Navigation =
   | { name: 'record'; defaultEmp?: Employee; defaultSkill?: string }
   | { name: 'contacts' }
   | { name: 'equipments' }
-  | { name: 'inspections' }
+  | { name: 'inspections'; defaultEquipmentId?: string }
   | { name: 'inventory' };
 
 export const RATING_META: Record<number, { label: string; desc: string; color: string; bg: string; light: string }> = {

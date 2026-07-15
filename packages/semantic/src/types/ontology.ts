@@ -86,7 +86,11 @@ export interface AppointmentObject {
         bolShipmentNo: string;
         customer: string;
         productType: string;
-        status: 'Scheduled' | 'Checked In' | 'Completed' | 'Late' | 'Missed';
+        // Lifecycle status. Includes gate states ('Scheduled', 'Checked In',
+        // 'Completed', 'Late', 'Missed') and DockX Kanban workflow stages
+        // ('Order Creation', 'Picking & Verification', 'Manifest', …), so it is
+        // an open string rather than a fixed union.
+        status: string;
         doorId: number | null;
         doorName: string | null;
         operatorId: number | null;
@@ -94,6 +98,8 @@ export interface AppointmentObject {
         checkInTime: string | null;
         checkOutTime: string | null;
         dwellTime: string | null;
+        pickerName: string | null;
+        verifierName: string | null;
     };
 }
 

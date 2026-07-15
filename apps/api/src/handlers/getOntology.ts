@@ -36,7 +36,7 @@ const mapAppointment = (a: any) => ({
     bolShipmentNo: a.bolShipmentNo, customer: a.customer, productType: a.productType,
     status: a.status, doorId: a.doorId, doorName: a.doorName, operatorId: a.operatorId,
     operatorName: a.operatorName, checkInTime: a.checkInTime, checkOutTime: a.checkOutTime,
-    dwellTime: a.dwellTime,
+    dwellTime: a.dwellTime, pickerName: a.pickerName, verifierName: a.verifierName,
   },
 });
 
@@ -53,7 +53,7 @@ const mapPitTask = (t: any) => ({
   id: t.id, objectType: 'PitTask',
   properties: {
     appointmentId: t.appointmentId, operatorName: t.operatorName, status: t.status,
-    startedAt: t.startedAt, completedAt: t.completedAt,
+    type: t.type, startedAt: t.startedAt, completedAt: t.completedAt,
   },
 });
 

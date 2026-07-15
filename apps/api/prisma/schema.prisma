@@ -100,6 +100,8 @@ model Appointment {
   checkInTime    String?
   checkOutTime   String?
   dwellTime      String?
+  pickerName     String?
+  verifierName   String?
   pitTask        PitTask?
 }
 
