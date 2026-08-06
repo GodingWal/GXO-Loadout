@@ -1,3 +1,4 @@
+import type { ActionTypeApiName } from '@gxo/semantic';
 import { verifyPalletAction } from './verifyPallet';
 import { assignLoadToLaneAction } from './assignLoadToLane';
 import { 
@@ -13,8 +14,11 @@ import {
     createEquipmentAction, updateEquipmentAction, deleteEquipmentAction
 } from './opsHubActions';
 
-// Registry tracking all valid backend operations
-export const actionRegistry: Record<string, (params: any) => Promise<any>> = {
+// Registry tracking all valid backend operations.
+//
+// Typed against the ontology's action names, so the compiler rejects a handler
+// with no ontology definition and an ontology action with no handler.
+export const actionRegistry: Record<ActionTypeApiName, (params: any) => Promise<any>> = {
     "VerifyPallet": verifyPalletAction,
     "AssignLoadToLane": assignLoadToLaneAction,
     

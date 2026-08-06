@@ -9,6 +9,9 @@ coverage/
 .DS_Store
 .turbo/
 
+# TypeScript incremental build state (generated per machine)
+*.tsbuildinfo
+
 # SQLite database files (generated, not source)
 *.db
 *.db-journal
