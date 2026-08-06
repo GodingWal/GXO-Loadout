@@ -8,6 +8,7 @@ export * from './state/inspectionMachine';
 export * from './state/palletMachine';
 
 export * from './types/ontology';
+export * from './ontology';
 export * from './client';
 
 // Components

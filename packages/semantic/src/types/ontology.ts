@@ -56,6 +56,7 @@ export interface InspectionObject {
         notes: string | null;
         result: string;
         loadId: string;
+        palletId: string | null;
     };
 }
 

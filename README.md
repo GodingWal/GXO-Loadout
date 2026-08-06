@@ -60,6 +60,53 @@ Generic, non-business-specific shared utilities and type exports.
 
 ---
 
+## 🧭 The Ontology
+
+`packages/semantic/src/ontology/` is the single description of **every piece of data in the system** — what we store, how it relates, and how it is allowed to change. The API, all four front-ends and the offline-first tablet records read from the same definitions.
+
+| File | Contents |
+|------|----------|
+| `types.ts` | The metadata model: what an object type, link, action and value type are made of |
+| `valueTypes.ts` | Closed enumerations (`LaneStatus`, `AppointmentStatus`, `JobRole`, `SkillRating`, `PalletType`, …) with display labels |
+| `objectTypes.ts` | All 17 object types, their properties, storage, primary key and REST path |
+| `linkTypes.ts` | Traversable relationships (`load-pallets`, `employee-coaching`, `appointment-pit-task`, …) |
+| `actionTypes.ts` | Every verb that can write data, with typed, validated parameters |
+| `validation.ts` | Runtime validation of action payloads and object records |
+| `parity.ts` | Compile-time assertions that the definitions still match the TypeScript interfaces |
+| `index.ts` | Lookup and traversal helpers plus the serializable metadata snapshot |
+
+### How it is enforced
+
+- **Reads** — `GET /api/ontology/{objectType}` resolves the URL segment through the ontology. An undeclared type returns `404` with the list of supported paths.
+- **Writes** — `POST /api/ontology/actions` looks the action up in the ontology and validates the payload (required parameters, scalar shapes, enum membership) *before* anything reaches Prisma. Undeclared parameters are logged as warnings rather than rejected.
+- **Handlers** — the backend action registry is typed as `Record<ActionTypeApiName, Handler>`, so a handler without a definition — or a definition without a handler — fails the build.
+- **Types** — `parity.ts` fails `tsc` if an interface property or enum member is added on one side and not the other.
+- **Tests** — `packages/semantic/__tests__/ontology.test.ts` checks registry integrity (unique paths, resolvable references, valid links) and the validation rules.
+
+### Introspection
+
+`GET /api/ontology/$metadata` returns the whole ontology as JSON — object types, links, actions and value types — so tooling and admin screens never need a hard-coded list.
+
+```ts
+import { ontologyClient, getObjectType, resolveLink, validateActionParameters } from '@gxo/semantic';
+
+const metadata = await ontologyClient.getMetadata();
+const loads = await ontologyClient.getObjects('Load');
+
+getObjectType('StagingLane')?.properties.status.valueType;   // 'LaneStatus'
+resolveLink('Load', 'Pallet');                               // { accessor: 'pallets', foreignKeyProperty: 'loadId', … }
+```
+
+### Adding to the ontology
+
+1. Add or change the Prisma model in `apps/api/prisma/schema.prisma`.
+2. Declare the object type (and any new value types / links) in `packages/semantic/src/ontology/`.
+3. Update the matching interface in `packages/semantic/src/types/ontology.ts` — `parity.ts` will tell you if you miss a property.
+4. For a new write, add the action definition **and** its handler in `apps/api/src/actions/` — the registry's type will not compile until both exist.
+5. For a new read, add the row mapper in `apps/api/src/handlers/getOntology.ts` keyed by the object type's `apiPath`.
+
+---
+
 ## ⚙️ Root Configuration Files
 
 - **`package.json`** — Master dependency manager. `"workspaces": ["apps/*", "packages/*"]` tells npm to symlink internal folders so they can share code locally.

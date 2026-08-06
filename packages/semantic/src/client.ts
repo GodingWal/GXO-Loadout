@@ -11,6 +11,7 @@ import type {
   ContactObject,
   EquipmentObject,
 } from './types/ontology';
+import { getObjectType, type OntologyMetadata } from './ontology';
 
 let _apiBase = '/api';
 
@@ -44,6 +45,31 @@ async function post<T = void>(actionType: string, params: object): Promise<T> {
 }
 
 export const ontologyClient = {
+  // ─── Ontology metadata ─────────────────────────────────────────
+  /** Fetches the live ontology served by the API: object types, links, actions, value types. */
+  getMetadata: async (): Promise<OntologyMetadata> => {
+    return get<OntologyMetadata>('/ontology/$metadata');
+  },
+
+  /**
+   * Generic read for any object type in the ontology, by apiName
+   * (e.g. `Load`) — useful for tooling and admin screens. The typed helpers
+   * below stay the ergonomic path for app code.
+   */
+  getObjects: async <T = unknown>(
+    objectTypeApiName: string,
+    query?: Record<string, string>
+  ): Promise<T[]> => {
+    const definition = getObjectType(objectTypeApiName);
+    if (!definition) throw new Error(`Unknown object type '${objectTypeApiName}'`);
+    if (!definition.apiPath) {
+      throw new Error(`Object type '${objectTypeApiName}' is not served over HTTP`);
+    }
+    const qs = query ? `?${new URLSearchParams(query).toString()}` : '';
+    const data = await get<{ objects: T[] }>(`/ontology/${definition.apiPath}${qs}`);
+    return data.objects;
+  },
+
   // ─── Staging Lanes (gxo-loadout) ───────────────────────────────
   getStagingLanes: async (): Promise<StagingLaneObject[]> => {
     const data = await get<{ objects: StagingLaneObject[] }>('/ontology/staging-lanes');
